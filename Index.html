@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>英语评测系统 V20.10 - 收藏特权版</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2; --success-color: #2ecc71; --danger-color: #e74c3c;
+            --bg-color: #f0f4f8; --card-bg: #ffffff; --text-main: #2c3e50;
+            --main-font: "Times New Roman", "Microsoft YaHei", "微软雅黑", sans-serif;
+        }
+        * { font-family: var(--main-font); box-sizing: border-box; }
+        body { background-color: var(--bg-color); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; height: 100vh; width: 100vw; overflow: hidden; }
+        
+        .dashboard { width: 100%; max-width: 1100px; max-height: 10vh; background: white; padding: 15px; border-radius: 20px; display: flex; justify-content: space-around; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .stat-item { text-align: center; position: relative; }
+        .stat-value { font-size: 32px; font-weight: 900; color: var(--primary-color); display: block; }
+        .stat-label { font-size: 14px; color: #7f8c8d; }
+        
+        /* 收藏夹按钮专属样式 */
+        .fav-dashboard-btn { cursor: pointer; transition: transform 0.2s; padding: 0 15px; border-radius: 12px; }
+        .fav-dashboard-btn:hover { background: #fff0f0; transform: scale(1.05); }
+
+        .nav-controls { position: fixed; top: 15px; left: 15px; z-index: 1001; display: none; gap: 10px; }
+        .nav-btn { background: white; border: 2px solid #ddd; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 16px; }
+
+        .main-container { flex: 1; width: 100%; max-width: 1100px; display: none; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: padding 0.3s ease; }
+
+        .library-section { background: white; padding: 35px; border-radius: 30px; width: 100%; max-width: 800px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.08); max-height: 85vh; display: flex; flex-direction: column; }
+        .book-list { flex: 1; margin: 20px 0; text-align: left; overflow-y: auto; border: 2px solid #f0f4f8; border-radius: 15px; padding: 10px; }
+        .book-item-wrapper { display: flex; align-items: center; border-bottom: 1px solid #f0f4f8; }
+        .book-item { flex: 1; padding: 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 20px; font-weight: bold; }
+        .del-mini { background: #fff0f0; color: var(--danger-color); border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-right: 10px; }
+
+        .upload-area { border: 3px dashed #cbd5e0; padding: 25px; border-radius: 20px; margin: 15px 0; background: #fafafa; position: relative; cursor: pointer; }
+        .upload-area input { position: absolute; width: 100%; height: 100%; top:0; left:0; opacity: 0; cursor: pointer; }
+
+        /* 星级与收藏专属样式 */
+        .word-level { font-size: 26px; color: #f39c12; margin-bottom: 10px; letter-spacing: 2px; }
+        .level-empty { opacity: 0.3; filter: grayscale(100%); }
+        /* 收藏按钮改为绝对定位至右上角 */
+        .fav-icon { position: absolute; top: 25px; right: 30px; font-size: 40px; cursor: pointer; transition: 0.2s; user-select: none; z-index: 10; }
+        .fav-icon:hover { transform: scale(1.2); }
+
+        .card-container { width: 100%; height: 75vh; perspective: 1500px; }
+        .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); transform-style: preserve-3d; cursor: pointer; }
+        .card.is-flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 30px; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .card-front .word-title { font-size: 120px; font-weight: 800; color: var(--primary-color); word-break: break-all; margin: 0; }
+        .card-back { transform: rotateY(180deg); color: var(--primary-color); gap: 12px; }
+        
+        .flat-card { width: 100%; height: 75vh; background: #fff; border-radius: 30px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); position: relative; }
+
+        .speaker-icon { font-size: 40px; cursor: pointer; margin-left: 15px; color: #a0aec0; transition: 0.2s; vertical-align: middle; user-select: none; }
+        .speaker-icon:hover { color: var(--primary-color); transform: scale(1.1); }
+
+        .back-row-text { font-size: 32px; font-weight: bold; margin: 0; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .back-phonetic { font-size: 32px; opacity: 0.8; margin: 0; }
+        .back-sentence { font-size: 32px; line-height: 1.2; margin: 0; text-align: center; max-width: 85%; }
+        .highlight-word { color: var(--danger-color) !important; font-weight: bold; }
+
+        .option-btn { width: 100%; padding: 20px; font-size: 34px; border: 2px solid #e2e8f0; background: white; border-radius: 20px; cursor: pointer; margin-bottom: 12px; font-weight: bold; }
+        .option-correct { background: var(--success-color) !important; color: white !important; }
+        .option-wrong { background: var(--danger-color) !important; color: white !important; }
+
+        .controls { width: 100%; display: flex; justify-content: center; align-items: center; min-height: 8vh; gap: 30px; margin-top: 20px; }
+        #globalProgress { font-size: 28px; font-weight: bold; }
+        #timerBarContainer { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-bottom: 15px; display: none; overflow: hidden; }
+        #timerBar { width: 100%; height: 100%; background: var(--danger-color); transition: width 0.1s linear; }
+
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
+        .overlay.active { display: flex; }
+        .modal { background: white; padding: 35px; border-radius: 40px; text-align: center; width: 95%; max-width: 450px; }
+        .btn { padding: 18px; font-size: 20px; border-radius: 15px; width: 100%; border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+
+        .spell-check-item { display: flex; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 22px; cursor: pointer; }
+        .spell-check-item input { width: 22px; height: 22px; margin-right: 15px; cursor: pointer; }
+        .spell-check-item:active { background: #f8f9fa; }
+
+        #testQuestion { font-size: 55px; color: var(--text-main); margin-bottom: 30px; text-align: center; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+        #spellQuestion { font-size: 50px; color: var(--text-main); margin-bottom: 30px; text-align: center; display: flex; align-items: center; justify-content: center; }
+
+        .char-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; width: 100%; }
+        .char-box { width: 45px; height: 60px; border-bottom: 4px solid #cbd5e0; font-family: 'Times New Roman', serif; font-size: 55px; font-weight: bold; display: flex; align-items: center; justify-content: center; color: var(--primary-color); transition: border-color 0.2s, transform 0.1s; }
+        .char-box.space { border-bottom: none; width: 25px; }
+        .char-box.active { border-bottom-color: var(--primary-color); transform: translateY(-3px); }
+        
+        .hidden-spell-input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; color: transparent; caret-color: transparent; border: none; outline: none; cursor: default; font-size: 20px; z-index: 10; pointer-events: none; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .shake { animation: shake 0.3s ease-in-out 2; }
+    </style>
+</head>
+<body>
+
+<div class="nav-controls" id="navControls">
+    <button class="nav-btn" onclick="location.reload()">📚 首页</button>
+    <button class="nav-btn" onclick="openModeSwitcher()">🧩 模式</button>
+</div>
+
+<div class="dashboard" id="globalDashboard">
+    <div class="stat-item"><span class="stat-value" id="stat-total">0</span><span class="stat-label">总词数</span></div>
+    <div class="stat-item"><span class="stat-value" id="stat-mastered" style="color:var(--success-color)">0</span><span class="stat-label">已牢记 (4星+)</span></div>
+    
+    <div class="stat-item fav-dashboard-btn" onclick="openFavorites()">
+        <span class="stat-value" id="stat-favs" style="color:var(--danger-color)">0</span>
+        <span class="stat-label" style="font-weight:bold; color:var(--danger-color);">💖 收藏夹 (点击)</span>
+    </div>
+</div>
+
+<div class="library-section" id="librarySection">
+    <h2 style="margin:0; font-size: 32px;">📚 词库中心</h2>
+    <div class="book-list" id="bookList"></div>
+    <div class="upload-area">
+        <div style="font-size: 18px; color: #718096; font-weight: bold;">➕ 点击或拖拽 CSV 词库存档</div>
+        <input type="file" id="csvFile" accept=".csv">
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <button class="btn" style="background:#2c3e50; color:white;" onclick="downloadMasterCSV()">📥 备份并导出进度</button>
+        <button class="btn" style="background:var(--danger-color); color:white;" onclick="secureReset()">⚠️ 抹除所有数据</button>
+    </div>
+</div>
+
+<div class="overlay" id="modeSelectorOverlay">
+    <div class="modal">
+        <h2 id="currentBookName" style="color:var(--primary-color); margin-bottom:25px; font-size: 28px;">词书</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button class="btn" style="background:var(--primary-color); color:white; margin-bottom:0;" onclick="startMode('memorize')">🎴 完整背诵</button>
+            <button class="btn" style="background:#3498db; color:white; margin-bottom:0;" onclick="startMode('customMemorize')">🧠 挑选强记</button>
+        </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button class="btn" style="background:#9b59b6; color:white; margin-bottom:0;" onclick="startMode('choice', 'engToChi')">📇 英译中</button>
+            <button class="btn" style="background:#8e44ad; color:white; margin-bottom:0;" onclick="startMode('choice', 'chiToEng')">📇 中译英</button>
+        </div>
+        <button class="btn" style="background:#2ecc71; color:white;" onclick="startMode('spell')">✏️ 拼写练习</button>
+        <button class="btn" style="background:#e67e22; color:white;" onclick="openExamSetup()">🎓 限时考试</button>
+        <button class="btn" style="background:#95a5a6; color:white;" onclick="closeOverlay()">返回</button>
+    </div>
+</div>
+
+<div class="overlay" id="examSetupOverlay">
+    <div class="modal">
+        <h2 style="color:var(--primary-color); margin-bottom:20px;">🎓 考试设置</h2>
+        <input type="number" id="examCount" min="20" max="100" value="20" style="width:100%; padding:15px; margin-bottom:10px; border-radius:12px; border:2px solid #eee;">
+        <select id="examType" style="width:100%; padding:15px; margin-bottom:15px; border-radius:12px; border:2px solid #eee; font-size:18px;">
+            <option value="engToChi">英译中</option>
+            <option value="chiToEng">中译英</option>
+        </select>
+        <button class="btn" style="background:var(--primary-color); color:white;" onclick="startExam()">开始 10s 考试</button>
+        <button class="btn" style="background:#95a5a6; color:white;" onclick="closeOverlay()">返回</button>
+    </div>
+</div>
+
+<div class="overlay" id="wordSelectionOverlay">
+    <div class="modal" style="max-width: 550px;">
+        <h2 id="selectionTitle" style="color:var(--primary-color); margin-bottom:20px;">🎯 选择单词</h2>
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px; gap: 10px;">
+            <button class="btn" id="toggleAllBtn" style="flex:1; background:#34495e; color:white; font-size:16px; padding:12px; margin:0;" onclick="toggleAllSelectionWords()">全不选</button>
+            <button class="btn" id="startSelectionBtn" style="flex:1; background:var(--primary-color); color:white; font-size:16px; padding:12px; margin:0;" onclick="startCustomSession()">开始</button>
+        </div>
+        <div id="selectionWordList" style="max-height: 50vh; overflow-y: auto; text-align: left; border: 2px solid #f0f4f8; border-radius: 12px; padding: 10px;">
+        </div>
+        <button class="btn" style="background:#95a5a6; color:white; margin-top:15px; margin-bottom:0;" onclick="openModeSwitcher()">返回上一页</button>
+    </div>
+</div>
+
+<div class="overlay" id="mistakeActionOverlay">
+    <div class="modal">
+        <h2 style="color:var(--primary-color); margin-bottom:20px;">💡 错题复习</h2>
+        <p style="font-size: 18px; color: #7f8c8d; margin-bottom: 25px;">在重做错题前，需要先用闪卡复习一遍吗？</p>
+        <button class="btn" style="background:#f39c12; color:white;" onclick="startMistakeFlashcards()">🎴 需要，先看闪卡</button>
+        <button class="btn" style="background:var(--danger-color); color:white;" onclick="reviewSessionMistakes()">✏️ 不用，直接重做</button>
+    </div>
+</div>
+
+<div class="main-container" id="learningContainer">
+    <div id="timerBarContainer"><div id="timerBar"></div></div>
+    
+    <div id="ui-memorize" style="display:none; width:100%">
+        <div class="card-container">
+            <div class="card" id="mainCard" onclick="toggleFlip()">
+                <div class="card-face card-front">
+                    <div class="fav-icon" id="frontFavBtn" onclick="toggleFavorite(event)">🤍</div>
+                    <div class="word-level" id="frontLevel"></div>
+                    <div class="word-title" id="frontWord"></div>
+                    <div style="margin-top:20px; display:flex; align-items:center; justify-content:center;">
+                        <div class="speaker-icon" onclick="handleWordVoiceOnly(event)">🔊</div>
+                    </div>
+                </div>
+                <div class="card-face card-back">
+                    <div class="fav-icon" id="backFavBtn" onclick="toggleFavorite(event)">🤍</div>
+                    <div class="word-level" id="backLevel"></div>
+                    <div id="backWord" style="font-size:45px; font-weight:800; margin:0;"></div>
+                    <div class="back-row-text">
+                        <span id="backPhonetic" style="font-size:32px; opacity:0.8; margin:0;"></span>
+                        <span class="speaker-icon" style="font-size:32px;" onclick="handleWordVoiceOnly(event)">🔊</span>
+                    </div>
+                    <div id="backMeaning" style="font-size:32px; font-weight:bold; margin:0; margin-top:10px;"></div>
+                    <div class="back-row-text" style="margin-top:15px;">
+                        <p id="backSentence" class="back-sentence"></p>
+                        <span class="speaker-icon" style="font-size:32px;" onclick="handleSentenceVoiceClick(event)">🔊</span>
+                    </div>
+                    <div id="backTranslation" style="font-size:32px; font-weight:500; margin:0;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ui-custom-memorize" style="display:none; width:100%">
+        <div class="flat-card">
+            <div class="fav-icon" id="smFavBtn" onclick="toggleFavorite(event)">🤍</div>
+            <div class="word-level" id="smLevel"></div>
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <div id="smWord" style="font-size: 80px; font-weight: 800; color: var(--primary-color); word-break: break-all; margin: 0;"></div>
+                <div class="speaker-icon" onclick="handleWordVoiceOnly(event)">🔊</div>
+            </div>
+            <div id="smPhonetic" style="font-size: 36px; opacity: 0.7; margin-bottom: 25px; color: var(--text-main);"></div>
+            <div id="smMeaning" style="font-size: 40px; font-weight: bold; margin-bottom: 35px; color: var(--text-main);"></div>
+            
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px; max-width: 90%;">
+                <p id="smSentence" style="font-size: 32px; line-height: 1.2; margin: 0; color: var(--primary-color);"></p>
+                <div class="speaker-icon" style="font-size: 32px;" onclick="handleSentenceVoiceClick(event)">🔊</div>
+            </div>
+            <div id="smTranslation" style="font-size: 28px; font-weight: 500; color: var(--primary-color); opacity: 0.8; margin: 0;"></div>
+        </div>
+    </div>
+    
+    <div id="ui-test" style="display:none; width:100%; flex-direction: column; align-items: center;">
+         <div id="testQuestion"></div>
+         <div id="optionsContainer" style="width:100%; max-width:600px;"></div>
+    </div>
+    
+    <div id="ui-spell" style="display:none; width:100%; flex-direction: column; align-items: center;">
+         <div id="spellQuestion"></div>
+         <div id="spellComparison" class="char-row" style="margin-bottom: 10px; opacity: 0.5;"></div>
+         <div style="position: relative; width: 100%; max-width: 800px; display: flex; justify-content: center; cursor: pointer;" onclick="focusSpellInput()">
+             <div id="spellInputVisual" class="char-row"></div>
+             <input type="text" id="spellInput" class="hidden-spell-input" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="latin" lang="en">
+         </div>
+    </div>
+    
+    <div class="controls">
+        <button class="nav-btn" id="prevBtn" onclick="goPrev()">上一个</button>
+        <span id="globalProgress"></span>
+        <button class="nav-btn" id="nextBtn" onclick="goNext()">下一个</button>
+    </div>
+</div>
+
+<div class="main-container" id="scoreContainer">
+    <div class="library-section">
+        <h2 style="font-size: 40px;" id="scoreTitle">🎉 完成</h2>
+        <div style="font-size:150px; font-weight:900; color:var(--primary-color);" id="finalScoreDisplay">
+            <span id="finalScore">0</span>
+        </div>
+        <div id="finalComment" style="font-size:32px; margin-bottom:30px;"></div>
+        
+        <button class="btn" id="continueWrongBtn" style="background:var(--danger-color); color:white; display:none;">重做错题</button>
+        
+        <button class="btn" style="background:var(--primary-color); color:white;" onclick="openModeSwitcher()">切换模式</button>
+        <button class="btn" style="background:#95a5a6; color:white;" onclick="location.reload()">首页</button>
+    </div>
+</div>
+
+<script>
+    let books = JSON.parse(localStorage.getItem('vocab_books_v12')) || { "汇总词库": [] };
+    let wordStats = JSON.parse(localStorage.getItem('word_stats_v12')) || {};
+    
+    let sessionWrongWords = []; 
+    let originalList = [], vocabList = [], currentIndex = 0, currentMode = '', isAnswered = false;
+    let examTimer = null, timeLeft = 10, currentExamType = 'engToChi', currentChoiceType = 'engToChi';
+
+    let cumulativeCorrectCount = 0;   
+    let originalSessionLength = 0;    
+    let isReviewMode = false;         
+    let pendingReviewMode = null; 
+    let selectionTargetMode = ''; 
+
+    window.onload = () => { refreshLibraryUI(); updateDashboard(); initFileUpload(); };
+
+    function focusSpellInput() { const input = document.getElementById('spellInput'); if (input && !input.disabled) input.focus(); }
+
+    function saveData() { 
+        localStorage.setItem('vocab_books_v12', JSON.stringify(books)); 
+        localStorage.setItem('word_stats_v12', JSON.stringify(wordStats)); 
+    }
+
+    function getWordLevelHTML(word) {
+        const stats = wordStats[word] || {s:0, f:0};
+        const s = stats.s; const f = stats.f; const total = s + f; const rate = total > 0 ? (s / total) : 0;
+        
+        if (total === 0) return '<span class="level-empty">☆☆☆☆☆</span>';
+        if (f > s) return '🔴☆☆☆☆';
+        if (s <= 2) return '⭐☆☆☆☆';
+        if (s <= 4) return '⭐⭐☆☆☆';
+        if (s <= 7 || rate < 0.8) return '⭐⭐⭐☆☆';
+        if (s <= 12 || rate < 0.9) return '⭐⭐⭐⭐☆';
+        return '⭐⭐⭐⭐⭐';
+    }
+
+    function toggleFavorite(e) {
+        e.stopPropagation();
+        const item = vocabList[currentIndex];
+        if(!wordStats[item.word]) wordStats[item.word] = {s:0, f:0, l:Date.now(), fav: false};
+        wordStats[item.word].fav = !wordStats[item.word].fav;
+        saveData(); updateFavIconUI(); updateDashboard();
+    }
+
+    function updateFavIconUI() {
+        if(!vocabList || vocabList.length === 0) return;
+        const item = vocabList[currentIndex];
+        const isFav = wordStats[item.word] && wordStats[item.word].fav;
+        const icon = isFav ? '💖' : '🤍';
+        if(document.getElementById('frontFavBtn')) document.getElementById('frontFavBtn').textContent = icon;
+        if(document.getElementById('backFavBtn')) document.getElementById('backFavBtn').textContent = icon;
+        if(document.getElementById('smFavBtn')) document.getElementById('smFavBtn').textContent = icon;
+    }
+
+    function openFavorites() {
+        const allWords = books["汇总词库"] || [];
+        const favWords = allWords.filter(item => wordStats[item.word] && wordStats[item.word].fav);
+        
+        if (favWords.length === 0) {
+            alert("💖 你的收藏夹目前是空的！\n\n在“完整背诵”或“挑选强记”模式中，点击右上角的🤍即可收藏。");
+            return;
+        }
+        
+        originalList = favWords; 
+        document.getElementById('currentBookName').textContent = "💖 我的专属收藏夹"; 
+        openModeSwitcher();
+    }
+
+    function refreshLibraryUI() {
+        const listEl = document.getElementById('bookList'); listEl.innerHTML = '';
+        Object.keys(books).forEach(title => {
+            const wrap = document.createElement('div'); wrap.className = 'book-item-wrapper';
+            const item = document.createElement('div'); item.className = `book-item ${title === "汇总词库"?"master":""}`;
+            item.innerHTML = `<span>📖 ${title}</span><small style="opacity:0.6;">${books[title].length} 词</small>`;
+            item.onclick = () => { originalList = books[title]; document.getElementById('currentBookName').textContent = title; openModeSwitcher(); };
+            wrap.appendChild(item);
+            if(title !== "汇总词库") {
+                const del = document.createElement('button'); del.className = 'del-mini'; del.textContent = '删除';
+                del.onclick = (e) => { e.stopPropagation(); if(confirm(`删除词库《${title}》?`)) { delete books[title]; saveData(); refreshLibraryUI(); updateDashboard(); } };
+                wrap.appendChild(del);
+            }
+            listEl.appendChild(wrap);
+        });
+    }
+
+    function initFileUpload() {
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const rows = evt.target.result.split(/\r?\n/);
+                let newList = [];
+                rows.forEach(row => {
+                    const cells = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    if (cells.length >= 2 && cells[0].replace(/^"|"$/g, '').trim() !== '' && cells[1].replace(/^"|"$/g, '').trim() !== '') { 
+                        let currentWord = cells[0].replace(/^"|"$/g, '').trim();
+                        newList.push({ 
+                            word: currentWord, 
+                            meaning: cells[1].replace(/^"|"$/g, '').trim(), 
+                            phonetic: (cells[2] || "").replace(/^"|"$/g, '').trim(), 
+                            sentence: (cells[3] || "").replace(/^"|"$/g, '').trim(), 
+                            translation: (cells[4] || "").replace(/^"|"$/g, '').trim(),
+                            defaultSpell: (cells[5] || "").replace(/^"|"$/g, '').trim() === '*' 
+                        });
+                        
+                        let s = 0, f = 0, l = Date.now(), fav = false;
+                        if (cells.length >= 9) {
+                            s = parseInt((cells[6] || "").replace(/^"|"$/g, '')) || 0;
+                            f = parseInt((cells[7] || "").replace(/^"|"$/g, '')) || 0;
+                            l = parseInt((cells[8] || "").replace(/^"|"$/g, '')) || Date.now();
+                        }
+                        if (cells.length >= 10) {
+                            fav = (cells[9] || "").replace(/^"|"$/g, '').trim() === '1';
+                        }
+
+                        if (s > 0 || f > 0 || fav) {
+                            if (!wordStats[currentWord]) {
+                                wordStats[currentWord] = {s: s, f: f, l: l, fav: fav};
+                            } else {
+                                wordStats[currentWord].s = Math.max(wordStats[currentWord].s, s);
+                                wordStats[currentWord].f = Math.max(wordStats[currentWord].f, f);
+                                wordStats[currentWord].l = Math.max(wordStats[currentWord].l, l);
+                                wordStats[currentWord].fav = wordStats[currentWord].fav || fav;
+                            }
+                        }
+                    }
+                });
+                const title = file.name.replace('.csv',''); books[title] = newList;
+                let m = new Map(); books["汇总词库"].forEach(i => m.set(i.word, i)); newList.forEach(i => m.set(i.word, i));
+                books["汇总词库"] = Array.from(m.values()).filter(i => i && i.word && i.word.trim() !== "" && i.meaning && i.meaning.trim() !== "");
+                
+                saveData(); refreshLibraryUI(); updateDashboard(); alert("导入成功，进度与收藏夹数据已同步！");
+            };
+            reader.readAsText(file, 'UTF-8'); this.value = '';
+        });
+    }
+
+    function openModeSwitcher() { closeOverlay(); document.getElementById('modeSelectorOverlay').classList.add('active'); }
+    function openExamSetup() { closeOverlay(); document.getElementById('examSetupOverlay').classList.add('active'); }
+    function openMistakeActionOverlay() { document.getElementById('mistakeActionOverlay').classList.add('active'); }
+    function closeOverlay() { document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active')); }
+
+    function downloadMasterCSV() {
+        let list = books["汇总词库"];
+        if (!list || list.length === 0) { alert("词库为空"); return; }
+        
+        let csv = "\ufeff单词,释义,音标,例句,翻译,拼写标记,答对次数(勿改),答错次数(勿改),最后复习时间戳,是否收藏(1为是)\n";
+        list.forEach(i => {
+            const wrap = (t) => `"${(t || "").toString().replace(/"/g, '""')}"`;
+            const spellMark = i.defaultSpell ? '"*"' : '""'; 
+            const s = wordStats[i.word] || {s:0, f:0, l:Date.now(), fav:false};
+            const isFav = s.fav ? "1" : "0";
+            
+            csv += `${wrap(i.word)},${wrap(i.meaning)},${wrap(i.phonetic)},${wrap(i.sentence)},${wrap(i.translation)},${spellMark},${s.s},${s.f},${s.l},${isFav}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = `我的完整词库与收藏夹存档_${new Date().getTime()}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url);
+    }
+
+    function startMode(mode, subType) { 
+        if ((mode === 'spell' || mode === 'customMemorize') && document.getElementById('currentBookName').textContent !== "汇总词库" && document.getElementById('currentBookName').textContent !== "💖 我的专属收藏夹") { 
+            openWordSelection(mode); return; 
+        }
+        currentMode = mode; if (subType) currentChoiceType = subType; 
+        currentIndex = 0; sessionWrongWords = []; isReviewMode = false; pendingReviewMode = null;
+        document.getElementById('timerBarContainer').style.display = 'none'; document.getElementById('prevBtn').style.visibility = 'visible'; 
+        prepareAndStart(); 
+    }
+    
+    function openWordSelection(targetMode) {
+        selectionTargetMode = targetMode; closeOverlay(); const container = document.getElementById('selectionWordList'); container.innerHTML = '';
+        document.getElementById('selectionTitle').innerHTML = targetMode === 'spell' ? '🎯 选择拼写单词' : '🧠 选择强记单词';
+        originalList.forEach((item, index) => {
+            const isChecked = targetMode === 'spell' ? (item.defaultSpell ? 'checked' : '') : ''; 
+            const isFavIcon = (wordStats[item.word] && wordStats[item.word].fav) ? '💖 ' : '';
+            const label = document.createElement('label'); label.className = 'spell-check-item';
+            label.innerHTML = `
+                <input type="checkbox" value="${index}" ${isChecked} onchange="updateSelectionBtnStatus()"> 
+                <span style="font-family:'Times New Roman',serif; font-weight:bold;">${isFavIcon}${item.word}</span>
+                <small style="color:#7f8c8d; font-size:16px; margin-left:10px; flex:1; text-align:right;">${item.meaning}</small>
+            `;
+            container.appendChild(label);
+        });
+        updateSelectionBtnStatus(); document.getElementById('wordSelectionOverlay').classList.add('active');
+    }
+
+    function toggleAllSelectionWords() {
+        const checkboxes = document.querySelectorAll('#selectionWordList input[type="checkbox"]');
+        const isAllChecked = Array.from(checkboxes).every(c => c.checked);
+        checkboxes.forEach(c => c.checked = !isAllChecked); updateSelectionBtnStatus();
+    }
+
+    function updateSelectionBtnStatus() {
+        const checkboxes = document.querySelectorAll('#selectionWordList input[type="checkbox"]');
+        const checkedCount = Array.from(checkboxes).filter(c => c.checked).length;
+        document.getElementById('toggleAllBtn').textContent = checkedCount === checkboxes.length ? "全不选" : "全选";
+        const actionText = selectionTargetMode === 'spell' ? "开始拼写" : "开始强记";
+        document.getElementById('startSelectionBtn').textContent = `${actionText} (${checkedCount})`;
+    }
+
+    function startCustomSession() {
+        const checkboxes = document.querySelectorAll('#selectionWordList input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) { alert("🎯 请至少选择一个单词！"); return; }
+        let selectedWords = Array.from(checkboxes).map(c => originalList[c.value]);
+        currentMode = selectionTargetMode === 'customMemorize' ? 'customMemorize' : 'spell'; 
+        currentIndex = 0; sessionWrongWords = []; isReviewMode = false; pendingReviewMode = null; 
+        document.getElementById('timerBarContainer').style.display = 'none'; document.getElementById('prevBtn').style.visibility = 'visible'; 
+        vocabList = [...selectedWords]; launchSession();
+    }
+
+    function startExam() { 
+        const count = parseInt(document.getElementById('examCount').value); 
+        currentMode = 'exam'; currentExamType = document.getElementById('examType').value; 
+        currentIndex = 0; sessionWrongWords = []; isReviewMode = false; pendingReviewMode = null;
+        document.getElementById('timerBarContainer').style.display = 'block'; document.getElementById('prevBtn').style.visibility = 'hidden'; 
+        prepareAndStart(count); 
+    }
+
+    function prepareAndStart(limit) {
+        vocabList = [...originalList];
+        vocabList.sort((a, b) => {
+            const sA = wordStats[a.word] || {f:0, s:0, l:Date.now(), fav:false};
+            const sB = wordStats[b.word] || {f:0, s:0, l:Date.now(), fav:false};
+            const favBonusA = sA.fav ? 0.5 : 0;
+            const favBonusB = sB.fav ? 0.5 : 0;
+            
+            const scoreA = (sA.f * 5) - sA.s + ((Date.now() - sA.l)/86400000) + favBonusA;
+            const scoreB = (sB.f * 5) - sB.s + ((Date.now() - sB.l)/86400000) + favBonusB;
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return Math.random() - 0.5;
+        });
+        if(limit) vocabList = vocabList.slice(0, limit);
+        launchSession();
+    }
+
+    function startMistakeFlashcards() {
+        closeOverlay(); pendingReviewMode = currentMode; currentMode = 'memorize'; 
+        let sourceList = originalList.length > 0 ? originalList : books["汇总词库"];
+        vocabList = sessionWrongWords.map(wordStr => sourceList.find(i => i.word === wordStr)).filter(Boolean);
+        currentIndex = 0; document.getElementById('scoreContainer').style.display = 'none'; 
+        document.getElementById('navControls').style.display = 'flex'; document.getElementById('learningContainer').style.display = 'flex';
+        document.getElementById('timerBarContainer').style.display = 'none'; document.getElementById('prevBtn').style.visibility = 'visible'; 
+        renderCurrent();
+    }
+
+    function reviewSessionMistakes() {
+        closeOverlay(); isReviewMode = true; 
+        let sourceList = originalList.length > 0 ? originalList : books["汇总词库"];
+        vocabList = sessionWrongWords.map(wordStr => sourceList.find(i => i.word === wordStr)).filter(Boolean);
+        currentIndex = 0; document.getElementById('scoreContainer').style.display = 'none'; 
+        document.getElementById('navControls').style.display = 'flex'; document.getElementById('learningContainer').style.display = 'flex';
+        if (currentMode === 'exam') document.getElementById('timerBarContainer').style.display = 'block';
+        renderCurrent();
+    }
+
+    function launchSession() {
+        if (!isReviewMode) { originalSessionLength = vocabList.length; cumulativeCorrectCount = 0; }
+        closeOverlay(); document.getElementById('librarySection').style.display = 'none'; document.getElementById('globalDashboard').style.display = 'none'; 
+        document.getElementById('scoreContainer').style.display = 'none'; document.getElementById('navControls').style.display = 'flex'; 
+        document.getElementById('learningContainer').style.display = 'flex'; renderCurrent();
+    }
+
+    function renderCurrent() {
+        const item = vocabList[currentIndex]; isAnswered = false;
+        document.getElementById('globalProgress').textContent = `${currentIndex+1} / ${vocabList.length}`;
+        document.getElementById('ui-test').style.display = 'none'; document.getElementById('ui-spell').style.display = 'none'; 
+        document.getElementById('ui-memorize').style.display = 'none'; document.getElementById('ui-custom-memorize').style.display = 'none';
+
+        const learnContainer = document.getElementById('learningContainer');
+        const starHTML = getWordLevelHTML(item.word);
+        updateFavIconUI();
+
+        if (currentMode === 'memorize') {
+            learnContainer.style.justifyContent = 'center'; learnContainer.style.paddingTop = '0'; isAnswered = true; 
+            document.getElementById('ui-memorize').style.display = 'block'; document.getElementById('mainCard').classList.remove('is-flipped');
+            
+            document.getElementById('frontLevel').innerHTML = starHTML;
+            document.getElementById('backLevel').innerHTML = starHTML;
+            
+            document.getElementById('frontWord').textContent = item.word; document.getElementById('backWord').textContent = item.word; 
+            document.getElementById('backPhonetic').textContent = item.phonetic; document.getElementById('backMeaning').textContent = item.meaning;
+            const regex = new RegExp(`(${item.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            document.getElementById('backSentence').innerHTML = (item.sentence || "").replace(regex, `<span style="color:var(--danger-color)!important;font-weight:bold;">$1</span>`);
+            document.getElementById('backTranslation').textContent = item.translation || ""; triggerVoice(item.word);
+        } else if (currentMode === 'customMemorize') {
+            learnContainer.style.justifyContent = 'center'; learnContainer.style.paddingTop = '0'; isAnswered = true; 
+            document.getElementById('ui-custom-memorize').style.display = 'block'; 
+            
+            document.getElementById('smLevel').innerHTML = starHTML;
+            
+            document.getElementById('smWord').textContent = item.word; document.getElementById('smPhonetic').textContent = item.phonetic; 
+            document.getElementById('smMeaning').textContent = item.meaning;
+            const regex = new RegExp(`(${item.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            document.getElementById('smSentence').innerHTML = (item.sentence || "").replace(regex, `<span style="color:var(--danger-color)!important;font-weight:bold;">$1</span>`);
+            document.getElementById('smTranslation').textContent = item.translation || ""; triggerVoice(item.word);
+        } else if (currentMode === 'choice' || currentMode === 'exam') {
+            learnContainer.style.justifyContent = 'center'; learnContainer.style.paddingTop = '0';
+            document.getElementById('ui-test').style.display = 'flex'; renderChoice(item);
+        } else if (currentMode === 'spell') {
+            learnContainer.style.justifyContent = 'flex-start'; learnContainer.style.paddingTop = '10vh';
+            document.getElementById('ui-spell').style.display = 'flex'; renderSpell(item);
+        }
+    }
+
+    function renderChoice(item) {
+        const container = document.getElementById('optionsContainer'); container.innerHTML = '';
+        const showEng = (currentMode === 'choice' && currentChoiceType === 'engToChi') || (currentMode === 'exam' && currentExamType === 'engToChi');
+        const questionEl = document.getElementById('testQuestion');
+        
+        const favIndicator = (wordStats[item.word] && wordStats[item.word].fav) ? '<span style="font-size:30px; margin-right:10px; opacity:0.8;">💖</span>' : '';
+        
+        if (showEng) {
+            questionEl.innerHTML = `${favIndicator}<span style="font-family:'Times New Roman',serif; font-size:75px;">${item.word}</span> <span class="speaker-icon" onclick="handleWordVoiceOnly(event)" style="font-size:45px; margin-left:15px;">🔊</span>`;
+            triggerVoice(item.word); 
+        } else {
+            questionEl.innerHTML = `${favIndicator}<span style="font-size:60px;">${item.meaning}</span>`;
+        }
+        const correctText = showEng ? item.meaning : item.word;
+        
+        let poolSource = originalList.length > 0 ? originalList : books["汇总词库"]; 
+        let pool = poolSource.filter(v => v && v.word && v.meaning && v.word !== item.word && v.word.trim() !== '' && v.meaning.trim() !== '');
+        
+        if (pool.length < 3) {
+            let extraPool = books["汇总词库"].filter(v => v && v.word && v.meaning && v.word !== item.word && v.word.trim() !== '' && v.meaning.trim() !== '' && !pool.some(p => p.word === v.word));
+            pool = pool.concat(extraPool);
+        }
+
+        let choices = [item, ...pool.sort(() => Math.random() - 0.5).slice(0, 3)].sort(() => Math.random() - 0.5);
+        choices.forEach(opt => {
+            const btn = document.createElement('button'); btn.className = 'option-btn'; 
+            if (!showEng) { btn.innerHTML = `<span style="font-family:'Times New Roman',serif;">${opt.word}</span>`; btn.dataset.text = opt.word; } 
+            else { btn.textContent = opt.meaning; btn.dataset.text = opt.meaning; }
+            btn.onclick = () => {
+                if (isAnswered) return; if (currentMode === 'exam') clearInterval(examTimer); 
+                isAnswered = true; const ok = (btn.dataset.text === correctText);
+                if(ok) { cumulativeCorrectCount++; if (isReviewMode) sessionWrongWords = sessionWrongWords.filter(w => w !== item.word); }
+                updateWordMastery(item.word, ok); triggerVoice(item.word);
+                btn.classList.add(ok ? 'option-correct' : 'option-wrong');
+                if (!ok) Array.from(container.children).forEach(b => { if(b.dataset.text === correctText) b.classList.add('option-correct'); });
+                if (currentMode === 'exam') setTimeout(goNext, 850);
+            };
+            container.appendChild(btn);
+        });
+        if (currentMode === 'exam') startTimer();
+    }
+
+    function renderSpell(item) {
+        const input = document.getElementById('spellInput'); const visual = document.getElementById('spellInputVisual'); const comparison = document.getElementById('spellComparison');
+        const favIndicator = (wordStats[item.word] && wordStats[item.word].fav) ? '<span style="font-size:30px; margin-right:10px;">💖</span>' : '';
+        document.getElementById('spellQuestion').innerHTML = `${favIndicator}<span>${item.meaning}</span> <span class="speaker-icon" onclick="handleWordVoiceOnly(event)" style="font-size:40px; margin-left:10px;">🔊</span>`;
+        input.value = ''; input.disabled = false; visual.style.display = 'flex'; comparison.style.opacity = '0.5'; 
+        let word = item.word; let indices = Array.from({length: word.length}, (_, i) => i).filter(i => word[i] !== ' ');
+        let hiddenIndices = indices.sort(() => Math.random() - 0.5).slice(0, Math.max(1, word.length - 2));
+        comparison.innerHTML = ''; visual.innerHTML = '';
+        for(let i=0; i<word.length; i++) {
+            const char = word[i]; const isSpace = (char === ' ');
+            const compBox = document.createElement('div'); compBox.className = 'char-box' + (isSpace ? ' space' : '');
+            compBox.style.borderBottom = 'none'; compBox.textContent = isSpace ? '' : (hiddenIndices.includes(i) ? '_' : char);
+            comparison.appendChild(compBox);
+            const inBox = document.createElement('div'); inBox.className = 'char-box' + (isSpace ? ' space' : ''); visual.appendChild(inBox);
+        }
+        updateVisualBoxes(); let isComposing = false;
+        input.oncompositionstart = () => { isComposing = true; };
+        input.oncompositionend = () => { isComposing = false; updateVisualBoxes(); if (input.value.length >= word.length) checkSpell(item); };
+        input.oninput = () => { if (isComposing) return; updateVisualBoxes(); if (input.value.length >= word.length) checkSpell(item); };
+        setTimeout(() => input.focus(), 200);
+    }
+
+    function updateVisualBoxes() {
+        const input = document.getElementById('spellInput'); const visual = document.getElementById('spellInputVisual'); const val = input.value;
+        Array.from(visual.children).forEach((box, i) => {
+            if (box.classList.contains('space')) { box.textContent = ''; return; }
+            box.textContent = val[i] || ''; 
+            if (i === val.length) box.classList.add('active'); else box.classList.remove('active');
+        });
+    }
+
+    function checkSpell(item) {
+        if (isAnswered) return; isAnswered = true; 
+        const input = document.getElementById('spellInput'); const userVal = input.value.toLowerCase(); input.disabled = true; 
+        const comparison = document.getElementById('spellComparison'); const visual = document.getElementById('spellInputVisual');
+        comparison.innerHTML = ''; comparison.style.opacity = '1'; visual.innerHTML = ''; 
+        const ok = (userVal === item.word.toLowerCase()); 
+        if(ok) { cumulativeCorrectCount++; if (isReviewMode) sessionWrongWords = sessionWrongWords.filter(w => w !== item.word); }
+        const maxLength = Math.max(item.word.length, userVal.length);
+        for(let i=0; i<maxLength; i++) {
+            const targetChar = item.word[i] || ""; const typedChar = userVal[i] || "";   
+            const isSpace = (targetChar === ' ' || (!targetChar && typedChar === ' '));
+            const topBox = document.createElement('div'); topBox.className = 'char-box' + (isSpace ? ' space' : ''); topBox.style.borderBottom = 'none';
+            if (targetChar && targetChar !== ' ') { topBox.textContent = targetChar; topBox.style.color = (typedChar === targetChar.toLowerCase()) ? '#2980b9' : 'var(--danger-color)'; }
+            comparison.appendChild(topBox);
+            const botBox = document.createElement('div'); botBox.className = 'char-box' + (isSpace ? ' space' : ''); botBox.style.borderBottom = 'none';
+            if (typedChar && typedChar !== ' ') {
+                botBox.textContent = typedChar;
+                if (typedChar === (targetChar || "").toLowerCase()) botBox.style.color = '#2980b9'; 
+                else { botBox.style.color = 'var(--danger-color)'; botBox.style.textDecoration = 'line-through'; botBox.style.opacity = '0.7'; }
+            } else if (!typedChar && targetChar && targetChar !== ' ') { botBox.textContent = '_'; botBox.style.color = 'var(--danger-color)'; botBox.style.opacity = '0.5'; }
+            visual.appendChild(botBox);
+        }
+        updateWordMastery(item.word, ok); triggerVoice(item.word);
+    }
+
+    function startTimer() {
+        clearInterval(examTimer); timeLeft = 10; document.getElementById('timerBar').style.width = '100%';
+        examTimer = setInterval(() => { 
+            timeLeft -= 0.1; document.getElementById('timerBar').style.width = (timeLeft * 10) + '%';
+            if (timeLeft <= 0) { 
+                clearInterval(examTimer); 
+                if (!isAnswered) { 
+                    isAnswered = true; const currentItem = vocabList[currentIndex]; updateWordMastery(currentItem.word, false);
+                    const showEng = (currentMode === 'exam' && currentExamType === 'engToChi');
+                    const correctText = showEng ? currentItem.meaning : currentItem.word;
+                    Array.from(document.getElementById('optionsContainer').children).forEach(b => { if(b.dataset.text === correctText) b.classList.add('option-correct'); });
+                    setTimeout(goNext, 850); 
+                }
+            }
+        }, 100);
+    }
+
+    function goNext() { 
+        if (!isAnswered && currentMode !== 'memorize' && currentMode !== 'customMemorize') {
+            document.getElementById('learningContainer').classList.add('shake'); setTimeout(()=>document.getElementById('learningContainer').classList.remove('shake'), 600); return;
+        } 
+        if (currentIndex < vocabList.length - 1) { currentIndex++; renderCurrent(); } else { showFinalScore(); } 
+    }
+    
+    function goPrev() { if (currentIndex > 0 && currentMode !== 'exam') { currentIndex--; renderCurrent(); } }
+
+    function showFinalScore() { 
+        document.getElementById('learningContainer').style.display = 'none'; document.getElementById('scoreContainer').style.display = 'flex'; 
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay'); const continueBtn = document.getElementById('continueWrongBtn');
+        const scoreTitle = document.getElementById('scoreTitle'); const finalComment = document.getElementById('finalComment');
+
+        if (pendingReviewMode) {
+            finalScoreDisplay.style.display = 'none'; scoreTitle.textContent = "💡 复习完成"; finalComment.textContent = `错题闪卡复习完毕，准备好消灭错题了吗？💪`;
+            continueBtn.style.display = 'inline-block'; continueBtn.textContent = `开始重做错题 (${sessionWrongWords.length})`;
+            continueBtn.onclick = () => { currentMode = pendingReviewMode; pendingReviewMode = null; reviewSessionMistakes(); }; return;
+        }
+
+        if (currentMode === 'memorize' || currentMode === 'customMemorize') {
+            finalScoreDisplay.style.display = 'none'; scoreTitle.textContent = "🎉 背诵完成"; finalComment.textContent = "太棒了！你已经过了一遍所选的单词！🌟"; continueBtn.style.display = 'none';
+        } else {
+            finalScoreDisplay.style.display = 'block'; 
+            let score = Math.round((cumulativeCorrectCount / originalSessionLength) * 100); score = score > 100 ? 100 : score;
+            document.getElementById('finalScore').textContent = score; 
+            if (sessionWrongWords.length > 0) {
+                scoreTitle.textContent = "🎯 继续努力"; finalComment.textContent = `还有 ${sessionWrongWords.length} 个单词，满分近在咫尺！💪`;
+                continueBtn.style.display = 'inline-block'; continueBtn.textContent = `消灭错题 (${sessionWrongWords.length})`; continueBtn.onclick = openMistakeActionOverlay;
+            } else {
+                scoreTitle.textContent = "🎉 完美通关"; finalComment.textContent = "太棒了！全对通关！🌟"; continueBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function updateWordMastery(word, ok) { 
+        if(currentMode === 'memorize' || currentMode === 'customMemorize') return; 
+        if(!wordStats[word]) wordStats[word] = {s:0, f:0, l:Date.now(), fav:false}; 
+        if(ok) wordStats[word].s++; else wordStats[word].f++; 
+        wordStats[word].l = Date.now(); 
+        if (!ok && !sessionWrongWords.includes(word)) { sessionWrongWords.push(word); }
+        saveData(); updateDashboard();
+    }
+
+    function triggerVoice(t) { if (!t) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; speechSynthesis.speak(u); }
+    function handleSentenceVoiceClick(e) { e.stopPropagation(); triggerVoice(vocabList[currentIndex].sentence); }
+    function handleWordVoiceOnly(e) { e.stopPropagation(); triggerVoice(vocabList[currentIndex].word); }
+    function toggleFlip() { if(!document.getElementById('mainCard').classList.contains('is-flipped')) { document.getElementById('mainCard').classList.add('is-flipped'); triggerVoice(vocabList[currentIndex].word); } else { document.getElementById('mainCard').classList.remove('is-flipped'); } }
+    
+    function secureReset() { const pwd = prompt("密码 083423："); if (pwd === "083423") { localStorage.clear(); location.reload(); } }
+    
+    function updateDashboard() { 
+        const all = books["汇总词库"] || []; let m = 0, l = 0, fav = 0; 
+        all.forEach(item => { 
+            const stats = wordStats[item.word] || {s:0, f:0, fav:false}; 
+            const total = stats.s + stats.f; const rate = total > 0 ? (stats.s / total) : 0;
+            if (stats.s >= 5 && rate >= 0.8) m++; else if (total > 0) l++; 
+            if (stats.fav) fav++;
+        }); 
+        document.getElementById('stat-total').textContent = all.length; 
+        document.getElementById('stat-mastered').textContent = m; 
+        document.getElementById('stat-favs').textContent = fav;
+    }
+</script>
+</body>
+</html>
